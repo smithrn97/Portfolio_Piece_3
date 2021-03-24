@@ -1,0 +1,82 @@
+---
+title: "pp3.rmd"
+author: "Rebecca Smith"
+date: "3/24/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# INTRODUCTION
+For this project, I will be doing another "guided" tutorial provided by medium.com (reference below). I've chosen to do this because I want to learn how to use the CRAN package "pewmethods". 
+
+I will be analyzing data from the Pew Research Center's spring 2017 Global Attitudes Survey, a poll that asks respondents in multiple countries about issues ranging from politics to economic conditions.
+
+# DOWNLOAD AND INSTALL LIBRARIES
+First, I will install the devtools package which will allow me to pull the pewmethods package from Pew's github repo. For the subsequent analyses, I will also need tidyverse, haven, rworldmap, and ggrepel packages. 
+
+```{r install}
+library(devtools)
+install_github("pewresearch/pewmethods", build_vignettes = TRUE, force = TRUE)
+library(pewmethods)
+library(tidyverse)
+library(rworldmap)
+library(ggrepel)
+```
+
+# DOWNLOAD DATASET
+Next, I will import the Global Attitudes Spring 2017 Dataset and save it as "gap_rd". This dataset contains more than 800 variables and 40,000 observations.
+
+```{r data}
+library(haven)
+gap_rd <- haven::read_sav("Pew-Research-Center-Spring-2017-Global-Attitudes-Survey_September-2018/Pew Research Global Attitudes Spring 2017 Dataset WEB FINAL.sav")
+gap_rd
+```
+
+# SELECT VARIABLES OF INTEREST
+
+For this project, we will examine two economically focused questions from the survey that were published in the report, "Global Publics More Upbeat About the Economy" (reference below). Because we will just be looking at two questions, I will first narrow down the dataset to the variables of interest: country (country variable), econ_sit (current economic situation in country), children_betteroff2 (will children be better off/worse off than parents), and weight (survey weights). 
+
+```{r select}
+gap2017 <- gap_rd %>%
+  select(Country, econ_sit, children_betteroff2, weight) %>%
+  haven::as_factor()
+```
+
+# TWO QUESTIONS
+
+Now, we will explore two questions: 
+1. How did people view their country's economic situation in 2017?
+2. Did people think that children in their country would be better or worse off than their parents?
+
+First, let's identify the countries included in the survey, find the exact wording of the questions based on the SPSS labels, and get country-level estimates for these two questions of interest.
+
+```{r countries included}
+unique(as.character(gap2017$Country))
+```
+38 countries were included in this dataset.
+```{r spss label}
+get_spss_label(gap2017, c("econ_sit", "children_betteroff2"))
+```
+Alright, now we know that the econ_sit variable corresponds to Q5 which asks, "Now thinking about our economic situation, how would you describe the current economic situation in (survey country) - is it very good, somewhat good, somewhat bad or very bad?". The children_betteroff2 variables corresponds to Q8, which asks, "When children today in (survey country) grow up, do you think they will be better off or worse off financially than their parents?".
+
+#CONVERT DATA
+
+The pewmethods package allows us to convert the data from individual - to country-level data. The code below instructs R to look at the econ_sit variable, apply survey weights (weight), group the data by the country2 variable, and round it to the nearest whole number. The result will be in a wide format.
+
+```{r convert_wide}
+econ_data_wide <- get_totals("econ_sit", gap2017, wt = "weight", by = "Country", na.rm = T, digits = 0)
+head(econ_data_wide)
+```
+
+The tutorial suggests that having the data in a long format, rather than wide, may help with analytic and graphing purposes. Below is the code I will use to attempt that:
+
+```{r convert_long}
+econ_data_long <- econ_data_wide %>%
+  gather(country, economy, -one_of("econ_sit", "weight_name"), factor_key = T)
+head(econ_data_long)
+```
