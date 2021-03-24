@@ -1,5 +1,5 @@
 ---
-title: "pp3.rmd"
+title: "Analyzing Data from Pew's 2017 Global Attitudes Survey"
 author: "Rebecca Smith"
 date: "3/24/2021"
 output: html_document
@@ -197,3 +197,9 @@ p <- children_data_long %>%
 plot(p)
 ```
 From this graphic, we can see that respondents from all countries included in this visualization believe that their children will be worse off financially. Well, that's depressing. AND that wraps up this portfolio piece!
+
+#REFERENCES
+Devlin, K. (2020, April 13). Analyzing international survey data with the pewmethods R package. Medium. https://medium.com/pew-research-center-decoded/analyzing-international-survey-data-with-the-pewmethods-r-package-3b0b21cba607
+
+NW, 1615 L. St, Suite 800Washington, & Inquiries, D. 20036USA202-419-4300 | M.-857-8562 | F.-419-4372 | M. (2017, June 5). Global Publics More Upbeat About the Economy. Pew Research Center’s Global Attitudes Project. https://www.pewresearch.org/global/2017/06/05/global-publics-more-upbeat-about-the-economy/
+
