@@ -80,3 +80,120 @@ econ_data_long <- econ_data_wide %>%
   gather(country, economy, -one_of("econ_sit", "weight_name"), factor_key = T)
 head(econ_data_long)
 ```
+
+The tutorial explains that the team at Pew Research Center that examines this survey data typically collapses the responses into "good" and "bad" categories by adding rounded totals for very/somewhat good and very/somewhat bad. The code to replicate this is below. The spread function will be used to shape the dataset from long back to wide.
+
+```{r collapse}
+econ_sit_collapse <- econ_data_long %>%
+  mutate(econ_eval = case_when(
+    econ_sit == "Very good" ~ "Good",
+    econ_sit == "Somewhat good" ~ "Good",
+    econ_sit == "Somewhat bad" ~ "Bad",
+    econ_sit == "Very bad" ~ "Bad",
+    TRUE ~ "DK/Refused"
+  )) %>%
+  group_by(country, econ_eval) %>%
+  summarise(share = sum(economy))
+
+final_econ <- econ_sit_collapse %>% spread(econ_eval, share)
+head(final_econ[c("country", "Good", "Bad", "DK/Refused")])
+```
+
+# RECREATE MAP
+The 2017 report includes a map (reference below) of the data that shows the share of respondents in each country who said the economic situation was good. Here is where the rworldmap package comes into play. Following the tutorial, I am going to try to recreate this map using said package.
+
+First, I need to recode the economy data into categories to mimic the color schme in the report map (though, this time, I will use a green/blue scale), turn it into a factor, and then re-elevel everything to keep it in the desired order (rather than in the default alphabetical order). 
+
+```{r recode econ_sit into cat vars}
+final_econ <- final_econ %>%
+  mutate(econ_good_cat = case_when(
+    Good < 20 ~ "<20%",
+    Good %in% 20:34 ~ "20-34",
+    Good %in% 35:49 ~ "35-49",
+    Good %in% 50:64 ~ "50-64",
+    Good %in% 65:80 ~ "60-80",
+    Good > 80 ~ ">80%") %>%
+  fct_relevel("<20%", "20-34", "35-49", "50-64", "65-80", ">80%")
+  ) %>%
+  ungroup
+
+sPDF <- joinCountryData2Map(final_econ, joinCode = "NAME", nameJoinColumn = "country")
+
+mapCountryData(sPDF,
+               nameColumnToPlot = "econ_good_cat",
+               catMethod = "categorical",
+               colourPalette = c("#1F497D", "#8DB5E2", "#C5D9F1", "#C4CA8A", "#949D48", "#707636"),
+               mapTitle = "% who say the current economic situation in our country is good, 2017",
+               missingCountryCol = "#F2F2F2")
+```
+
+YAY! It worked! The resulting map mimics the map included in the report. 
+
+# LOOKING AT CHILDREN BETTER/WORSE OFF IN EUROPEAN COUNTRIES
+The survey includes a question that asks whether respondents think their children will be better or worse off financially than their parents. Let's look at the positive and negative sides of the question for some European countries surveyed.
+
+First, I have to filter the dataset.
+
+```{r filter euro}
+gap2017_EU <- gap2017 %>%
+  filter(Country %in% c("United Kingdom", "France", "Germany", "Netherlands", "Spain", "Sweden", "Poland", "Greece", "Hungary", "Italy"))
+
+children_data_wide <- get_totals("children_betteroff2",
+                                 gap2017_EU, wt = "weight", by = "Country", na.rm = T, digits = 0)
+
+children_data_long <- children_data_wide %>% gather(country, value, -one_of("children_betteroff2", "weight_name"), factor_key = T)
+
+head(children_data_long)
+sample_n(children_data_long, 10)
+```
+
+# CREATING BAR CHARTS
+
+One of the reasons why I picked this tutorial is because I want to learn how to create accurate, succinct, and visually-appealing graphs to represent Pew data. This tutorial explains that the global attitudes team at Pew often displays the data in horizontal bar charts. To do this, we first need to manipulate the data in order to make a plot similar to those published in Pew reports. The bar chart will require both negative and positive values, so I will first create a new variable called children_bars that makes any "worse off" category negative while keeping the "better off" values positive. I will then mad the bar color to our graphic using "fill = children_betteroff2". I can then use the new children_bars variable to sort the data based on the "better off" values. 
+
+To create the dataset I need for the graphic, I will filter the children_data_long dataframe to only the "better off" or "worse off" responses, pipe it to ggplot2 and customize the design of the graphic. The fct_reorder function will allow me to sort the data by the percent who say "better off" at the country level in descending order.
+
+```{r horizontal bargraph}
+#specify top margin
+margin(t = 10)
+p <- children_data_long %>%
+  filter(!(children_betteroff2 %in% c("Don’t know (DO NOT READ)",
+                                      "Same (DO NOT READ)",
+                                      "Refused (DO NOT READ)")
+  )) %>%
+  mutate(
+    children_bars = ifelse(children_betteroff2 == "Worse off", value * -1, value),
+    children_betteroff2 = fct_relevel(children_betteroff2, 
+                                      "Worse off", "Better off"),
+    better_only = ifelse(children_betteroff2 == "Better off", value, 0)
+  ) %>% 
+  ggplot(
+    aes(x = reorder(country, better_only),
+        y = children_bars,
+        fill = children_betteroff2,
+        group = children_betteroff2
+    )
+  ) +
+  geom_bar(stat = "identity") +
+  geom_label(
+    aes(
+      label = abs(as.numeric(children_bars))
+      
+    ),
+    fill = "white"
+  ) + 
+  scale_fill_manual(values = c("Better off" = "#949D48", "Worse off" = "#006699")) +
+  coord_flip() +
+  theme(
+    axis.line = element_blank(),
+    panel.background = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "top", 
+    legend.title = element_blank(),
+    axis.title = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 11, face = "bold")
+  )
+plot(p)
+```
+From this graphic, we can see that respondents from all countries included in this visualization believe that their children will be worse off financially. Well, that's depressing. AND that wraps up this portfolio piece!
